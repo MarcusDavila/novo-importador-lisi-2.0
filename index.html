@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importador Contas a Pagar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-align: center;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input[type="number"],
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            background-color: #0f172a;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            padding: 2rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 1.5rem;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.active {
+            border-color: var(--primary);
+            background-color: rgba(99, 102, 241, 0.05);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: none;
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+            font-size: 0.875rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .success {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .error {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .log-item {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Importador LISI 2.0</h1>
+        <p class="subtitle">Automação de Contas a Pagar</p>
+
+        <div class="form-group">
+            <label for="valorBase">Valor Base Padrão (R$)</label>
+            <input type="number" id="valorBase" placeholder="Ex: 515.00" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label for="tituloId">Identificador do Título</label>
+            <input type="text" id="tituloId" placeholder="Ex: RESSARC DESP">
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            Arraste o CSV aqui ou clique para selecionar
+            <input type="file" id="fileInput" accept=".csv" style="display: none;">
+        </div>
+
+        <button id="btnImportar">Iniciar Importação</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const btnImportar = document.getElementById('btnImportar');
+        const statusDiv = document.getElementById('status');
+
+        let selectedFile = null;
+
+        dropZone.onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => {
+            selectedFile = e.target.files[0];
+            dropZone.innerText = selectedFile ? `Selecionado: ${selectedFile.name}` : 'Arraste o CSV aqui ou clique para selecionar';
+        };
+
+        btnImportar.onclick = async () => {
+            const valorBase = document.getElementById('valorBase').value;
+            const tituloId = document.getElementById('tituloId').value;
+
+            if (!selectedFile || !valorBase || !tituloId) {
+                alert('Preencha todos os campos e selecione um arquivo.');
+                return;
+            }
+
+            btnImportar.disabled = true;
+            btnImportar.innerText = 'Processando...';
+            statusDiv.style.display = 'block';
+            statusDiv.className = '';
+            statusDiv.innerHTML = 'Enviando dados...';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('valorBase', valorBase);
+            formData.append('tituloId', tituloId);
+
+            try {
+                const response = await fetch('/api/importar', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusDiv.className = 'success';
+                    statusDiv.innerHTML = `<strong>Sucesso!</strong><br>`;
+                    result.resultados.forEach(res => {
+                        const div = document.createElement('div');
+                        div.className = 'log-item';
+                        div.innerText = `${res.nome}: ${res.status} ${res.seq ? '(SEQ: ' + res.seq + ')' : ''}`;
+                        statusDiv.appendChild(div);
+                    });
+                } else {
+                    statusDiv.className = 'error';
+                    statusDiv.innerText = 'Erro: ' + result.error;
+                }
+            } catch (err) {
+                statusDiv.className = 'error';
+                statusDiv.innerText = 'Erro de conexão com o servidor.';
+            } finally {
+                btnImportar.disabled = false;
+                btnImportar.innerText = 'Iniciar Importação';
+            }
+        };
+    </script>
+</body>
+
+</html>

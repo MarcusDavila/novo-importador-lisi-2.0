@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importador Contas a Pagar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Importador LISI 2.0</h1>
+        <p class="subtitle">Automação de Contas a Pagar</p>
+
+        <div class="form-group">
+            <label for="valorBase">Valor Base Padrão (R$)</label>
+            <input type="number" id="valorBase" placeholder="Ex: 515.00" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label for="tituloId">Identificador do Título</label>
+            <input type="text" id="tituloId" placeholder="Ex: RESSARC DESP">
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            Arraste o CSV aqui ou clique para selecionar
+            <input type="file" id="fileInput" accept=".csv" style="display: none;">
+        </div>
+
+        <button id="btnImportar">Iniciar Importação</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+
+</html>

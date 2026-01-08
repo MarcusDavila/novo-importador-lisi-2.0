@@ -1,0 +1,43 @@
+-- 1. Obter a próxima sequência (Obrigatório)
+SELECT fnc_sequence('contaapagar', 1, 1, 1, 1, NULL, NULL); 
+
+-- 2. Inserir na tabela principal (Contaapagar)
+INSERT INTO Contaapagar (
+    grupo, empresa, filial, unidade, sequencia, numerotitulo, numeroparcela, 
+    usuarioemissor, moeda, reduzido, reduzidodebito, cnpjcpfcodigo, valortitulo, 
+    valortitulomoeda, valorpendente, dtemissaotitulo, dtvencimento, dtprevisaopagamento, 
+    composicao, tipotitulo, semaforo, formapagamento
+) VALUES (
+    1, 1, 1, 1, :v_sequencia, :v_numero_titulo, 1, 
+    199, 1, :v_conta_credito, :v_conta_debito, :v_fornecedor, :v_valor, 
+    :v_valor, :v_valor, :v_data, :v_data, :v_data, 
+    3, 4, 0, 2
+);
+
+-- 3. Inserir a Composição (Vincula o documento original)
+INSERT INTO Contaapagar_composicao (
+    grupo, empresa, filial, unidade, sequencia, sequenciacomposicao, 
+    tipodocumentoorigem, dtemissaodocumentoorigem, numerosequenciadocumentoorigem, 
+    cnpjcpfcodigo, reduzido, valortitulo, tipotitulo
+) VALUES (
+    1, 1, 1, 1, :v_sequencia, 1, 2, :v_data, :v_sequencia, :v_fornecedor, :v_conta_credito, :v_valor, 4
+);
+
+-- 4. Contabilização (CRÉDITO)
+INSERT INTO Contaapagar_contabilizacao (
+    grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, 
+    reduzido, valorcredito, historico, historicodescricao, apropriacao, contabilizar, valorsaldo, cnpjcpfcodigo
+) VALUES (
+    1, 1, 1, 1, :v_sequencia, 1, :v_conta_credito, :v_valor, :v_historico_id, :v_historico_txt, 1, 1, :v_valor, :v_fornecedor
+);
+
+-- 5. Contabilização (DÉBITO)
+INSERT INTO Contaapagar_contabilizacao (
+    grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, 
+    reduzido, valordebito, historico, historicodescricao, apropriacao, contabilizar, valorsaldo, cnpjcpfcodigo, incluidomanualmente
+) VALUES (
+    1, 1, 1, 1, :v_sequencia, 2, :v_conta_debito, :v_valor, :v_historico_id, :v_historico_txt, 2, 1, :v_valor, :v_fornecedor, 2
+);
+
+-- 6. Atualizar o Semáforo (Importante para o sistema liberar o título)
+SELECT Fnc_trocasemaforo_contaapagar(1, 1, 1, 1, :v_sequencia, 1, 199, 1);
