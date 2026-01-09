@@ -15,10 +15,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve os arquivos estáticos da pasta public
+
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rota raiz serve o index.html da pasta public
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -33,7 +32,7 @@ const pool = new Pool({
 
 const upload = multer();
 
-// Parâmetros fixos
+
 const GRUPO = 1, EMPRESA = 1, FILIAL = 1, UNIDADE = 1;
 const USUARIO_ID = 199;
 const MOEDA_ID = 1;
@@ -54,11 +53,51 @@ function getDiasMesAnterior() {
     };
 }
 
+
+app.post('/api/consultar-motoristas', async (req, res) => {
+    const { nomes } = req.body;
+
+    if (!nomes || !Array.isArray(nomes)) {
+        return res.status(400).json({ error: 'Lista de nomes inválida.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        const resultados = [];
+
+        for (const nome of nomes) {
+      
+            const resQuery = await client.query("SELECT codigo FROM cadastro WHERE razaosocial = $1 LIMIT 1", [nome]);
+
+            if (resQuery.rows.length > 0) {
+                resultados.push({
+                    nome: nome,
+                    cpf: resQuery.rows[0].codigo,
+                    encontrado: true
+                });
+            } else {
+                resultados.push({
+                    nome: nome,
+                    cpf: null,
+                    encontrado: false
+                });
+            }
+        }
+
+        res.json({ resultados });
+    } catch (err) {
+        console.error('Erro ao consultar motoristas:', err);
+        res.status(500).json({ error: 'Erro ao consultar banco de dados.' });
+    } finally {
+        client.release();
+    }
+});
+
 app.post('/api/importar', upload.single('file'), async (req, res) => {
-    const { valorBase, tituloId } = req.body;
+    const { valorBase, tituloId, previewData } = req.body;
     const file = req.file;
 
-    if (!file || !valorBase || !tituloId) {
+    if (!tituloId) {
         return res.status(400).json({ error: 'Faltam dados obrigatórios.' });
     }
 
@@ -66,30 +105,40 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
     const dataHoje = new Date().toISOString().split('T')[0];
     let records = [];
 
-    // Detectar tipo de arquivo
-    const fileName = file.originalname.toLowerCase();
-    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-
     try {
-        if (isExcel) {
-            // Processar Excel
-            const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            records = XLSX.utils.sheet_to_json(worksheet);
-        } else {
-            // Processar CSV
-            const parser = Readable.from(file.buffer).pipe(parse({
-                columns: true,
-                delimiter: [';', ','],
-                skip_empty_lines: true,
-                trim: true,
-                bom: true
+     
+        if (previewData) {
+            const parsedPreview = JSON.parse(previewData);
+            records = parsedPreview.map(item => ({
+                NOME: item.nome,
+                Dias: item.dias,
+                valorEditado: item.valor //valor editavel pelo usuario
             }));
+        } else if (file) {
+      
+            const fileName = file.originalname.toLowerCase();
+            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
 
-            for await (const row of parser) {
-                records.push(row);
+            if (isExcel) {
+                const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                records = XLSX.utils.sheet_to_json(worksheet);
+            } else {
+                const parser = Readable.from(file.buffer).pipe(parse({
+                    columns: true,
+                    delimiter: [';', ','],
+                    skip_empty_lines: true,
+                    trim: true,
+                    bom: true
+                }));
+
+                for await (const row of parser) {
+                    records.push(row);
+                }
             }
+        } else {
+            return res.status(400).json({ error: 'Nenhum arquivo ou dados fornecidos.' });
         }
 
         const client = await pool.connect();
@@ -104,9 +153,12 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
 
                 if (isNaN(diasTrabalhados)) continue;
 
-                const valorCalculado = parseFloat(((parseFloat(valorBase) / totalDias) * diasTrabalhados).toFixed(2));
+ 
+                const valorCalculado = record.valorEditado !== undefined
+                    ? parseFloat(record.valorEditado)
+                    : parseFloat(((parseFloat(valorBase) / totalDias) * diasTrabalhados).toFixed(2));
 
-                // 1. Buscar Código
+
                 const resM = await client.query("SELECT codigo FROM cadastro WHERE razaosocial = $1 LIMIT 1", [nomeMotorista]);
                 if (resM.rows.length === 0) {
                     resultados.push({ nome: nomeMotorista || 'Nome Desconhecido', status: 'Erro: Motorista não encontrado no cadastro', semSucesso: true });
@@ -114,14 +166,14 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
                 }
                 const v_fornecedor = resM.rows[0].codigo;
 
-                // 2. Sequência
+
                 const resSeq = await client.query("SELECT fnc_sequence('contaapagar', $1, $2, $3, $4, NULL, NULL)", [GRUPO, EMPRESA, FILIAL, UNIDADE]);
                 const v_sequencia = resSeq.rows[0].fnc_sequence;
 
                 const v_num_titulo = tituloId;
                 const v_historico = `REF. RESSARCIMENTO DESPESAS - ${nomeMotorista} - ${mes.toString().padStart(2, '0')}/${ano}`;
 
-                // 3. Insert Contaapagar
+
                 await client.query(`
                     INSERT INTO Contaapagar (
                         grupo, empresa, filial, unidade, sequencia, numerotitulo, numeroparcela, 
@@ -131,7 +183,7 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
                     ) VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, $9, $10, $11, $12, $12, $12, $13, $13, $13, 3, $14, 0, $15, $13, 1)
                 `, [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, v_num_titulo, USUARIO_ID, MOEDA_ID, REDUZIDO_CREDITO, REDUZIDO_DEBITO, v_fornecedor, valorCalculado, dataHoje, TIPO_TITULO, FORMA_PAGAMENTO]);
 
-                // 4. Insert Composicao
+
                 await client.query(`
                     INSERT INTO Contaapagar_composicao (
                         grupo, empresa, filial, unidade, sequencia, sequenciacomposicao, 
@@ -143,7 +195,7 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
                     ) VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $5, $8, $9, $10, $11, $7, $1, $2, $3, $4, $8, 1, $7, $7, 1)
                 `, [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, TIPODOC_ORIGEM, dataHoje, v_fornecedor, REDUZIDO_CREDITO, valorCalculado, TIPO_TITULO]);
 
-                // 5. Contabilização Crédito
+
                 await client.query(`
                     INSERT INTO Contaapagar_contabilizacao (
                         grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, 
@@ -154,7 +206,7 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
                 await client.query("INSERT INTO Contaapagar_contabilizacao_filial (grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, filialcontabilizado, valorsaldo, valorcredito) VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $7)", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, FILIAL, valorCalculado]);
                 await client.query("INSERT INTO Contaapagar_contabilizacao_filial_unidade (grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, filialcontabilizado, unidadecontabilizado, valorsaldo, valorcredito) VALUES ($1, $2, $3, $4, $5, 1, $6, $7, $8, $8)", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, FILIAL, UNIDADE, valorCalculado]);
 
-                // 6. Contabilização Débito
+
                 await client.query(`
                     INSERT INTO Contaapagar_contabilizacao (
                         grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, 
@@ -165,15 +217,12 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
                 await client.query("INSERT INTO Contaapagar_contabilizacao_filial (grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, filialcontabilizado, valorsaldo, valordebito) VALUES ($1, $2, $3, $4, $5, 2, $6, $7, $7)", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, FILIAL, valorCalculado]);
                 await client.query("INSERT INTO Contaapagar_contabilizacao_filial_unidade (grupo, empresa, filial, unidade, sequencia, sequenciacontabilizacao, filialcontabilizado, unidadecontabilizado, valorsaldo, valordebito) VALUES ($1, $2, $3, $4, $5, 2, $6, $7, $8, $8)", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, FILIAL, UNIDADE, valorCalculado]);
 
-                // 7. Semáforo
                 await client.query("SELECT Fnc_trocasemaforo_contaapagar($1, $2, $3, $4, $5, 1, $6, 1)", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, USUARIO_ID]);
 
                 await client.query("UPDATE contaapagar SET usuarioalteracao = $6 WHERE grupo = $1 AND empresa = $2 AND filial = $3 AND unidade = $4 AND sequencia = $5", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, USUARIO_ID]);
 
-                // 8. Enviar Email
                 await client.query("SELECT fnc_enviaremail_gestaofinanceiro (2, $1, $2, $3, $4, $5, NULL, NULL, NULL, NULL, NULL, 1, NULL, $6, 1)", [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia, USUARIO_ID]);
 
-                // 9. Verificar Acerto Viagem
                 await client.query(`
                     SELECT acertoviagemagregado.liberaracertoagregadocontaapagar 
                     FROM acertoviagemagregado 
@@ -191,7 +240,6 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
                         AND contaapagar_composicao.sequencia = $5
                 `, [GRUPO, EMPRESA, FILIAL, UNIDADE, v_sequencia]);
 
-                // 10. Verificar Parâmetro
                 await client.query("SELECT controlaralteracaodelecao FROM empresa_parametro WHERE grupo = $1 AND empresa = $2 AND tipodocumento = 2", [GRUPO, EMPRESA]);
 
                 resultados.push({ nome: nomeMotorista, status: 'Sucesso', seq: v_sequencia, valor: valorCalculado });
@@ -199,7 +247,6 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
 
             await client.query('COMMIT');
 
-            // Verifica se houve algum erro
             const totalErros = resultados.filter(r => r.semSucesso).length;
             const message = totalErros > 0 ? 'Processamento concluído com alertas.' : 'Processamento concluído com sucesso total.';
 

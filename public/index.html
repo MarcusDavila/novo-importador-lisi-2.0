@@ -34,11 +34,37 @@
             <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
         </div>
 
-        <button id="btnImportar">Iniciar Importação</button>
+
+        <div id="previewSection" class="preview-section" style="display: none;">
+            <h3>📋 Prévia dos Dados</h3>
+            <p class="preview-info">Revise os dados antes de importar. Você pode editar os valores clicando neles.</p>
+            <div class="table-container">
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th>CPF</th>
+                            <th>Nome</th>
+                            <th>Dias</th>
+                            <th>Valor (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody">
+
+                    </tbody>
+                </table>
+            </div>
+            <div class="preview-actions">
+                <button type="button" id="btnCancelar" class="btn-cancel">Cancelar</button>
+                <button type="button" id="btnConfirmar" class="btn-confirm">Confirmar Importação</button>
+            </div>
+        </div>
+
+        <button id="btnImportar" style="display: none;">Iniciar Importação</button>
 
         <div id="status"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="js/script.js"></script>
 </body>
 
