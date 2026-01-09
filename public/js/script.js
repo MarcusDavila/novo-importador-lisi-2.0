@@ -1,4 +1,6 @@
+// File Import Logic
 const dropZone = document.getElementById('dropZone');
+const dropZoneText = document.getElementById('dropZoneText');
 const fileInput = document.getElementById('fileInput');
 const btnImportar = document.getElementById('btnImportar');
 const statusDiv = document.getElementById('status');
@@ -31,7 +33,13 @@ fileInput.onchange = (e) => {
 };
 
 function updateFileInfo() {
-    dropZone.innerText = selectedFile ? `Selecionado: ${selectedFile.name}` : 'Arraste o CSV aqui ou clique para selecionar';
+    if (selectedFile) {
+        dropZoneText.textContent = `✅ ${selectedFile.name}`;
+        dropZone.classList.add('has-file');
+    } else {
+        dropZoneText.textContent = '📁 Arraste o arquivo aqui (CSV ou Excel)';
+        dropZone.classList.remove('has-file');
+    }
 }
 
 btnImportar.onclick = async () => {
@@ -39,15 +47,15 @@ btnImportar.onclick = async () => {
     const tituloId = document.getElementById('tituloId').value;
 
     if (!selectedFile || !valorBase || !tituloId) {
-        alert('Preencha todos os campos e selecione um arquivo.');
+        alert('⚠️ Preencha todos os campos e selecione um arquivo.');
         return;
     }
 
     btnImportar.disabled = true;
-    btnImportar.innerText = 'Processando...';
+    btnImportar.innerText = '⏳ Processando...';
     statusDiv.style.display = 'block';
     statusDiv.className = '';
-    statusDiv.innerHTML = 'Enviando dados...';
+    statusDiv.innerHTML = '<div style="text-align: center;">Enviando dados ao servidor...</div>';
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -64,7 +72,6 @@ btnImportar.onclick = async () => {
 
         if (response.ok) {
             const hasErrors = result.totalErros > 0;
-
             statusDiv.className = hasErrors ? 'error' : 'success';
 
             let htmlContent = `<strong>${result.message}</strong><br><br>`;
@@ -83,11 +90,11 @@ btnImportar.onclick = async () => {
             statusDiv.innerHTML = htmlContent;
         } else {
             statusDiv.className = 'error';
-            statusDiv.innerText = 'Erro: ' + (result.error || 'Erro desconhecido');
+            statusDiv.innerText = '❌ Erro: ' + (result.error || 'Erro desconhecido');
         }
     } catch (err) {
         statusDiv.className = 'error';
-        statusDiv.innerText = 'Erro de conexão com o servidor. Verifique se o backend está rodando.';
+        statusDiv.innerText = '❌ Erro de conexão com o servidor. Verifique se o backend está rodando.';
     } finally {
         btnImportar.disabled = false;
         btnImportar.innerText = 'Iniciar Importação';

@@ -3,6 +3,7 @@ const multer = require('multer');
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 const { parse } = require('csv-parse');
+const XLSX = require('xlsx');
 const cors = require('cors');
 const { Readable } = require('stream');
 const path = require('path');
@@ -63,19 +64,32 @@ app.post('/api/importar', upload.single('file'), async (req, res) => {
 
     const { totalDias, mes, ano } = getDiasMesAnterior();
     const dataHoje = new Date().toISOString().split('T')[0];
-    const records = [];
+    let records = [];
 
-    const parser = Readable.from(file.buffer).pipe(parse({
-        columns: true,
-        delimiter: [';', ','],
-        skip_empty_lines: true,
-        trim: true,
-        bom: true
-    }));
+    // Detectar tipo de arquivo
+    const fileName = file.originalname.toLowerCase();
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
 
     try {
-        for await (const row of parser) {
-            records.push(row);
+        if (isExcel) {
+            // Processar Excel
+            const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            records = XLSX.utils.sheet_to_json(worksheet);
+        } else {
+            // Processar CSV
+            const parser = Readable.from(file.buffer).pipe(parse({
+                columns: true,
+                delimiter: [';', ','],
+                skip_empty_lines: true,
+                trim: true,
+                bom: true
+            }));
+
+            for await (const row of parser) {
+                records.push(row);
+            }
         }
 
         const client = await pool.connect();

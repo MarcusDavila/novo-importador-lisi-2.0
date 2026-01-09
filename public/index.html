@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Importador Contas a Pagar</title>
+    <title>Importador Enlonamento | Contas a Pagar</title>
+    <meta name="description" content="Sistema de importação automatizada de contas a pagar">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,8 +14,10 @@
 
 <body>
     <div class="container">
-        <h1>Importador LISI 2.0</h1>
-        <p class="subtitle">Automação de Contas a Pagar</p>
+        <div class="header">
+            <h1>Importador Enlonamento</h1>
+            <p class="subtitle">Automação de Contas a Pagar</p>
+        </div>
 
         <div class="form-group">
             <label for="valorBase">Valor Base Padrão (R$)</label>
@@ -23,12 +26,12 @@
 
         <div class="form-group">
             <label for="tituloId">Identificador do Título</label>
-            <input type="text" id="tituloId" placeholder="Ex: RESSARC DESP">
+            <input type="text" id="tituloId" placeholder="Ex: RESSARC DESP 01/2026">
         </div>
 
         <div class="drop-zone" id="dropZone">
-            Arraste o CSV aqui ou clique para selecionar
-            <input type="file" id="fileInput" accept=".csv" style="display: none;">
+            <span id="dropZoneText">📁 Arraste o arquivo aqui (CSV ou Excel)</span>
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
         </div>
 
         <button id="btnImportar">Iniciar Importação</button>
