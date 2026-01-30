@@ -15,7 +15,7 @@ function getDiasMesAnterior() {
     const hoje = new Date();
     const dataMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
     return {
-        totalDias: dataMesAnterior.getDate(),
+        totalDias: 30, // Alterado para fixo 30 dias conforme solicitado
         mes: dataMesAnterior.getMonth() + 1,
         ano: dataMesAnterior.getFullYear()
     };
@@ -115,14 +115,23 @@ function renderPreview(data) {
         previewBody.appendChild(row);
     });
 
+    updateTotalValue(); // Calculate initial total
     previewSection.style.display = 'block';
 }
 
 
 function updatePreviewValue(index, newValue) {
     previewData[index].valor = parseFloat(newValue) || 0;
+    updateTotalValue(); // Recalculate total on edit
 }
 
+function updateTotalValue() {
+    const total = previewData.reduce((acc, item) => acc + (item.valor || 0), 0);
+    const totalElement = document.getElementById('totalValueDisplay');
+    if (totalElement) {
+        totalElement.textContent = `Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+}
 
 window.updatePreviewValue = updatePreviewValue;
 
